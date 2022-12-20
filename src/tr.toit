@@ -9,7 +9,7 @@ Inspired by the tr command line utility.
 Translates strings using a mapping between ASCII characters.
 Non-ASCII characters can be removed, or left untouched, but not otherwise mapped between.
 */
-class Tr:
+class Translator:
   // When deleting, a 256-entry one-zero map.
   // When mapping, a 256-entry byte map with identity values for the top 128.
   byte_array_map_ /ByteArray
@@ -22,9 +22,9 @@ class Tr:
   /// Variant of $(constructor --delete --complement --squeeze source destination).
   constructor --squeeze/bool=false source/string destination/string:
     if destination.size == 0 and source.size != 0: throw "Need at least one char to transform to"
-    return Tr.private_ --squeeze=squeeze --map_utf_8_to=null source destination
+    return Translator.private_ --squeeze=squeeze --map_utf_8_to=null source destination
 
-  // map_utf_8_to of null, means map to themselves.
+  // If map_utf_8_to is null, non-ASCII characters map to themselves.
   // Otherwise it can be set to an ASCII char they should be mapped to.
   constructor.private_ --squeeze/bool=false --map_utf_8_to/int? source/string destination/string:
     byte_array_map_ = ByteArray 256: it
@@ -80,7 +80,7 @@ class Tr:
   constructor --complement/bool --squeeze/bool=false source/string destination/string:
     if destination.size == 0: throw "Need at least one char to transform to"
     // Since we are complementing, we first construct the complemented source argument.
-    if not complement: return Tr --squeeze=squeeze source destination
+    if not complement: return Translator --squeeze=squeeze source destination
     one_zero_map := one_zero_map_ source
     total := #[0]
     // Count the ones, where the character is not in the complemented set.
@@ -91,7 +91,7 @@ class Tr:
     128.repeat: if it != '-' and one_zero_map[it] == 0: complemented[pos++] = it
     default /int := destination[destination.size - 1]
     // Now that we have the complemented source argument, call the constructor.
-    return Tr.private_ --squeeze=squeeze --map_utf_8_to=default complemented.to_string destination
+    return Translator.private_ --squeeze=squeeze --map_utf_8_to=default complemented.to_string destination
 
   /**
   Provide a $source set of characters that can use ranges and a $destination
@@ -117,24 +117,24 @@ class Tr:
     replacement characters, so this makes most sense with --squeeze.
   # Examples
   ```
-    tr := Tr "a-z" "A-Z"
+    tr := Translator "a-z" "A-Z"
     tr.tr "hello!"  // Evaluates to "HELLO!"
-    rot13 := Tr "a-zA-Z" "n-za-mN-ZA-M"
+    rot13 := Translator "a-zA-Z" "n-za-mN-ZA-M"
     rot13.tr "Hello!" // Evaluates to "Uryyb!"
-    dasher := Tr "a-zA-Z" "-"
+    dasher := Translator "a-zA-Z" "-"
     dasher.tr "Hello, Wørld!"  // Evaluates to "-----, -ø---!"
-    simplifier := Tr --delete --complement "a-zA-Z0-9._-"
+    simplifier := Translator --delete --complement "a-zA-Z0-9._-"
     simplifier.tr "Tricky æøå \\ / \0.txt"  // Evaluates to "Tricky.txt"
-    non_ascii_remover := Tr --complement --delete "\0-\x7f"
+    non_ascii_remover := Translator --complement --delete "\0-\x7f"
     non_ascii_remover.tr #['A', 0x80, 0xff, 'b', 0xe0, 'c']  // Evaluates to "Abc"
   ```
   */
   constructor --delete/bool --complement/bool=false --squeeze/bool=false source/string destination/string?=null:
     if not delete:
       if destination == null: throw "With --delete=false a destination string must be supplied"
-      return Tr --complement=complement --squeeze=squeeze source destination
+      return Translator --complement=complement --squeeze=squeeze source destination
     // This is a factory constructor so we tail call a regular, private constructor.
-    return Tr.delete_ --complement=complement --squeeze=squeeze source destination
+    return Translator.delete_ --complement=complement --squeeze=squeeze source destination
 
   constructor.delete_ --complement/bool=false --squeeze/bool=false source/string destination/string?:
     // Since we are deleting, a second argument is only for squeezing.
@@ -177,5 +177,5 @@ class Tr:
     result := ba.to_string 0 out_pos
     return (in is string and result == in) ? in : result
 
-/// An instance of $Tr that rot13-encodes and -decodes.
-ROT13 ::= Tr "a-zA-Z" "n-za-mN-ZA-M"
+/// An instance of $Translator that rot13-encodes and -decodes.
+ROT13 ::= Translator "a-zA-Z" "n-za-mN-ZA-M"
